@@ -25,93 +25,23 @@ jobs:
       - name: Run Atmos Vendor Pull
         run: atmos vendor pull
 
-      - name: Commit Changes via GitHub GraphQL API
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ github.head_ref }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+      - name: Check for Changes
+        id: git-check
         run: |
-          set -euo pipefail
-
-          commitMessage="chore: Update vendored code via atmos vendor pull"
-
-          # Build list of files at HEAD
-          mapfile -t files_at_head < <(git ls-tree -r --name-only HEAD)
-          declare -A head_files
-          for f in "${files_at_head[@]}"; do
-            head_files["$f"]=1
-          done
-
-          additions=()
-          deletions=()
-
-          while IFS= read -r -d $'\0' status_line; do
-              filename="${status_line:3}"
-              git_status="${status_line:0:2}"
-              if [[ "$git_status" == "D " ]]; then
-                  if [[ -n "${head_files[$filename]+exists}" ]]; then
-                      deletions+=("$filename")
-                  else
-                      echo "Skipping deletion: $filename does not exist in HEAD"
-                  fi
-              elif [[ -f "$filename" ]]; then
-                  additions+=("$filename")
-              else
-                  echo "Skipping non-file: $filename"
-              fi
-          done < <(git status --porcelain=v1 -z)
-
-          if [[ "${#additions[@]}" -eq 0 && "${#deletions[@]}" -eq 0 ]]; then
-              echo "No changes to commit"
-              exit 0
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
           fi
 
-          # Build deletions JSON
-          deletions_json=$(printf '%s\n' "${deletions[@]}" | jq -R -s -c 'split("\n")[:-1] | map({path: .})')
-
-          # Build additions JSON
-          additions_json="[]"
-          for file in "${additions[@]}"; do
-            encoded=$(base64 < "$file" | tr -d '\n')
-            additions_json=$(jq -c --arg path "$file" --arg contents "$encoded" \
-              '. + [{path: $path, contents: $contents}]' <<< "$additions_json")
-          done
-
-          echo "$additions_json" > additions.json
-          echo "$deletions_json" > deletions.json
-
-          # Build final GraphQL mutation payload
-          jq -n \
-            --arg repo "$REPO" \
-            --arg branch "$BRANCH" \
-            --arg sha "$SHA" \
-            --arg msg "$commitMessage" \
-            --slurpfile adds additions.json \
-            --slurpfile dels deletions.json \
-            '
-            {
-              query: "mutation ($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url } } }",
-              variables: {
-                input: {
-                  branch: {
-                    repositoryNameWithOwner: $repo,
-                    branchName: $branch
-                  },
-                  message: {
-                    headline: $msg
-                  },
-                  fileChanges: {
-                    additions: $adds[0],
-                    deletions: $dels[0]
-                  },
-                  expectedHeadOid: $sha
-                }
-              }
-            }' > payload.json
-
-          # Submit mutation to GitHub
-          curl -sSf -X POST https://api.github.com/graphql \
-            -H "Authorization: bearer $GH_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data @payload.json
+      - name: Commit and Push Vendored Code
+        if: steps.git-check.outputs.changes == 'true'
+        uses: ryancyq/github-signed-commit@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            modules/**/*.tf
+            modules/**/*.tfvars
+            modules/**/*.md
+          commit-message: Committing files
