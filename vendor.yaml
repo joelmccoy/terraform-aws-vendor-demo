@@ -12,5 +12,4 @@ spec:
         - "modules/cloudposse/label/null"
       included_paths:
         - "**/*.tf"
-        - "**/*.tfvars"
         - "**/*.md"

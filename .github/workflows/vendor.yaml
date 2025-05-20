@@ -25,80 +25,23 @@ jobs:
       - name: Run Atmos Vendor Pull
         run: atmos vendor pull
 
-      - name: Check and Commit Changes via GraphQL
-        if: ${{ success() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ github.head_ref }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+      - name: Check for Changes
+        id: git-check
         run: |
-          set -euo pipefail
-
-          additions=()
-          deletions=()
-
-          while IFS= read -r -d $'\0' status_line; do
-              filename="${status_line:3}"
-              git_status="${status_line:0:2}"
-              if [[ "$git_status" == "D " ]]; then
-                  deletions+=("$filename")
-              else
-                  additions+=("$filename")
-              fi
-          done < <(git status --porcelain=v1 -z)
-
-          if [[ "${#additions[@]}" -eq 0 && "${#deletions[@]}" -eq 0 ]]; then
-              echo "No changes to commit"
-              exit 0
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
           fi
 
-          commitMessage="chore: Update vendored code via atmos vendor pull"
-
-          # Create deletions JSON
-          deletions_json=$(printf '%s\n' "${deletions[@]}" | jq -R -s -c 'split("\n")[:-1] | map({path: .})')
-
-          # Prepare additions JSON: file path + base64 content
-          additions_json=$(jq -n --raw-input --null-input \
-            --argjson files "$(printf '%s\n' "${additions[@]}" | jq -R -s -c 'split("\n")[:-1]')" \
-            '
-            $files | map({
-              path: .,
-              contents: (inputs | @base64)
-            })
-            ' < <(for file in "${additions[@]}"; do cat "$file"; echo ""; done))
-
-          # Construct GraphQL payload
-          jq -n \
-            --arg repo "$REPO" \
-            --arg branch "$BRANCH" \
-            --arg sha "$SHA" \
-            --arg msg "$commitMessage" \
-            --argjson adds "$additions_json" \
-            --argjson dels "$deletions_json" \
-            '
-            {
-              query: "mutation ($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url } } }",
-              variables: {
-                input: {
-                  branch: {
-                    repositoryNameWithOwner: $repo,
-                    branchName: $branch
-                  },
-                  message: {
-                    headline: $msg
-                  },
-                  fileChanges: {
-                    additions: $adds,
-                    deletions: $dels
-                  },
-                  expectedHeadOid: $sha
-                }
-              }
-            }' > payload.json
-
-          # Submit mutation
-          curl -sSf -X POST https://api.github.com/graphql \
-            -H "Authorization: bearer $GH_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data @payload.json
+      - name: Commit and Push Vendored Code
+        if: steps.git-check.outputs.changes == 'true'
+        uses: ryancyq/github-signed-commit@v1
+        env:
+          # TODO: Make this a bot PAT
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            modules/**/*.tf
+            modules/**/*.md
+          commit-message: "chore: update vendored code"
