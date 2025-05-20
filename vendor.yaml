@@ -1,0 +1,16 @@
+apiVersion: atmos/v1
+kind: AtmosVendorConfig
+metadata:
+  name: terraform-aws-vendor-demo
+  description: Atmos vendoring manifest
+spec:
+  sources:
+    - component: "label"
+      source: "github.com/cloudposse/terraform-null-label.git?ref={{.Version}}"
+      version: "0.24.1"
+      targets:
+        - "modules/cloudposse/label/null"
+      included_paths:
+        - "**/*.tf"
+        - "**/*.tfvars"
+        - "**/*.md"
