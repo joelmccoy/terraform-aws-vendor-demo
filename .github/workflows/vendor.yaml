@@ -67,14 +67,18 @@ jobs:
               '. + [{path: $path, contents: $contents}]' <<< "$additions_json")
           done
 
-          # Construct GraphQL mutation
+          # Write additions and deletions JSON to files
+          echo "$additions_json" > additions.json
+          echo "$deletions_json" > deletions.json
+
+          # Build final GraphQL mutation payload
           jq -n \
             --arg repo "$REPO" \
             --arg branch "$BRANCH" \
             --arg sha "$SHA" \
             --arg msg "$commitMessage" \
-            --argjson adds "$additions_json" \
-            --argjson dels "$deletions_json" \
+            --slurpfile adds additions.json \
+            --slurpfile dels deletions.json \
             '
             {
               query: "mutation ($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url } } }",
@@ -88,15 +92,15 @@ jobs:
                     headline: $msg
                   },
                   fileChanges: {
-                    additions: $adds,
-                    deletions: $dels
+                    additions: $adds[0],
+                    deletions: $dels[0]
                   },
                   expectedHeadOid: $sha
                 }
               }
             }' > payload.json
 
-          # Submit the mutation to GitHub
+          # Submit mutation
           curl -sSf -X POST https://api.github.com/graphql \
             -H "Authorization: bearer $GH_TOKEN" \
             -H "Content-Type: application/json" \
