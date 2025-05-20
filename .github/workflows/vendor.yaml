@@ -25,8 +25,7 @@ jobs:
       - name: Run Atmos Vendor Pull
         run: atmos vendor pull
 
-      - name: Check and Commit Changes via GraphQL
-        if: ${{ success() }}
+      - name: Commit Changes via GitHub GraphQL API
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -43,8 +42,10 @@ jobs:
               git_status="${status_line:0:2}"
               if [[ "$git_status" == "D " ]]; then
                   deletions+=("$filename")
-              else
+              elif [[ -f "$filename" ]]; then
                   additions+=("$filename")
+              else
+                  echo "Skipping non-file: $filename"
               fi
           done < <(git status --porcelain=v1 -z)
 
@@ -55,20 +56,18 @@ jobs:
 
           commitMessage="chore: Update vendored code via atmos vendor pull"
 
-          # Create deletions JSON
+          # Build deletions JSON
           deletions_json=$(printf '%s\n' "${deletions[@]}" | jq -R -s -c 'split("\n")[:-1] | map({path: .})')
 
-          # Prepare additions JSON: file path + base64 content
-          additions_json=$(jq -n --raw-input --null-input \
-            --argjson files "$(printf '%s\n' "${additions[@]}" | jq -R -s -c 'split("\n")[:-1]')" \
-            '
-            $files | map({
-              path: .,
-              contents: (inputs | @base64)
-            })
-            ' < <(for file in "${additions[@]}"; do cat "$file"; echo ""; done))
+          # Build additions JSON
+          additions_json="[]"
+          for file in "${additions[@]}"; do
+            encoded=$(base64 < "$file" | tr -d '\n')
+            additions_json=$(jq -c --arg path "$file" --arg contents "$encoded" \
+              '. + [{path: $path, contents: $contents}]' <<< "$additions_json")
+          done
 
-          # Construct GraphQL payload
+          # Construct GraphQL mutation
           jq -n \
             --arg repo "$REPO" \
             --arg branch "$BRANCH" \
@@ -97,7 +96,7 @@ jobs:
               }
             }' > payload.json
 
-          # Submit mutation
+          # Submit the mutation to GitHub
           curl -sSf -X POST https://api.github.com/graphql \
             -H "Authorization: bearer $GH_TOKEN" \
             -H "Content-Type: application/json" \
