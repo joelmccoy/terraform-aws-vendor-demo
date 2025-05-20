@@ -40,8 +40,15 @@ jobs:
           while IFS= read -r -d $'\0' status_line; do
               filename="${status_line:3}"
               git_status="${status_line:0:2}"
-              if [[ "$git_status" == "D " ]]; then
-                  deletions+=("$filename")
+              if [[ "$git_status" == "D " && -e "$filename" ]]; then
+                  # Still exists on disk (weird edge case), skip
+                  echo "Skipping deletion: $filename still exists on disk"
+              elif [[ "$git_status" == "D " ]]; then
+                  if git ls-tree --name-only HEAD "$filename" >/dev/null 2>&1; then
+                      deletions+=("$filename")
+                  else
+                      echo "Skipping deletion: $filename not found in last commit"
+                  fi
               elif [[ -f "$filename" ]]; then
                   additions+=("$filename")
               else
