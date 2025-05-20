@@ -34,20 +34,26 @@ jobs:
         run: |
           set -euo pipefail
 
+          commitMessage="chore: Update vendored code via atmos vendor pull"
+
+          # Build list of files at HEAD
+          mapfile -t files_at_head < <(git ls-tree -r --name-only HEAD)
+          declare -A head_files
+          for f in "${files_at_head[@]}"; do
+            head_files["$f"]=1
+          done
+
           additions=()
           deletions=()
 
           while IFS= read -r -d $'\0' status_line; do
               filename="${status_line:3}"
               git_status="${status_line:0:2}"
-              if [[ "$git_status" == "D " && -e "$filename" ]]; then
-                  # Still exists on disk (weird edge case), skip
-                  echo "Skipping deletion: $filename still exists on disk"
-              elif [[ "$git_status" == "D " ]]; then
-                  if git ls-tree --name-only HEAD "$filename" >/dev/null 2>&1; then
+              if [[ "$git_status" == "D " ]]; then
+                  if [[ -n "${head_files[$filename]+exists}" ]]; then
                       deletions+=("$filename")
                   else
-                      echo "Skipping deletion: $filename not found in last commit"
+                      echo "Skipping deletion: $filename does not exist in HEAD"
                   fi
               elif [[ -f "$filename" ]]; then
                   additions+=("$filename")
@@ -61,8 +67,6 @@ jobs:
               exit 0
           fi
 
-          commitMessage="chore: Update vendored code via atmos vendor pull"
-
           # Build deletions JSON
           deletions_json=$(printf '%s\n' "${deletions[@]}" | jq -R -s -c 'split("\n")[:-1] | map({path: .})')
 
@@ -74,7 +78,6 @@ jobs:
               '. + [{path: $path, contents: $contents}]' <<< "$additions_json")
           done
 
-          # Write additions and deletions JSON to files
           echo "$additions_json" > additions.json
           echo "$deletions_json" > deletions.json
 
@@ -107,7 +110,7 @@ jobs:
               }
             }' > payload.json
 
-          # Submit mutation
+          # Submit mutation to GitHub
           curl -sSf -X POST https://api.github.com/graphql \
             -H "Authorization: bearer $GH_TOKEN" \
             -H "Content-Type: application/json" \
