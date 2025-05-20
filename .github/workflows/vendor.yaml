@@ -1,0 +1,52 @@
+name: Vendor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  vendor:
+    name: Check and Update Vendored Code
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '>=1.19.0'
+
+      - name: Install Atmos
+        run: |
+          go install github.com/cloudposse/atmos@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          atmos --version
+
+      - name: Run Atmos Vendor Pull
+        run: atmos vendor pull
+
+      - name: Check for Changes
+        id: git-check
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and Push Changes
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "[auto] Update vendored code via atmos vendor pull"
+          git push
