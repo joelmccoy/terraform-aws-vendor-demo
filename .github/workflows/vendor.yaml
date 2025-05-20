@@ -38,9 +38,10 @@ jobs:
         if: steps.git-check.outputs.changes == 'true'
         uses: ryancyq/github-signed-commit@v1
         env:
+          # TODO: Make this a bot PAT
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: |
             modules/**/*.tf
             modules/**/*.md
-          commit-message: Committing files
+          commit-message: "chore: update vendored code"
