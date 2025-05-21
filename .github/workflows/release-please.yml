@@ -21,15 +21,15 @@ jobs:
       - id: release-flag
         run: echo "release_created=${{ steps.tag.outputs.release_created || false }}" >> $GITHUB_OUTPUT
 
-    publish-oci:
-      name: Publish Module as OCI
-      needs: release-please
-      if: ${{ needs.release-please.outputs.release_created == 'true'}}
-      permissions:
-        contents: write
-        packages: write
-      uses: ./.github/actions/publish-oci
-      with:
-        repository: ${{ github.repository }}
-        tag: ${{ needs.release-please.outputs.tag_name }}
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+  publish-oci:
+    name: Publish Module as OCI
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true'}}
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/actions/publish-oci
+    with:
+      repository: ${{ github.repository }}
+      tag: ${{ needs.release-please.outputs.tag_name }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
