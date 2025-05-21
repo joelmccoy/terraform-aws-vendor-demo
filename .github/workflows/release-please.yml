@@ -22,6 +22,7 @@ jobs:
         run: echo "release_created=${{ steps.tag.outputs.release_created || false }}" >> $GITHUB_OUTPUT
 
   publish-oci:
+    runs-on: ubuntu-latest
     name: Publish Module as OCI
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true'}}
