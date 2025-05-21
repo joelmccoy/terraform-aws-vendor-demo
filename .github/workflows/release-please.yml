@@ -28,8 +28,10 @@ jobs:
     permissions:
       contents: write
       packages: write
-    uses: ./.github/actions/publish-oci
-    with:
-      repository: ${{ github.repository }}
-      tag: ${{ needs.release-please.outputs.tag_name }}
-      github-token: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/publish-oci
+        with:
+          repository: ${{ github.repository }}
+          tag: ${{ needs.release-please.outputs.tag_name }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
