@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/joelmccoy/terraform-aws-vendor-demo/compare/v0.1.2...v0.1.3) (2025-05-21)
+
+
+### Bug Fixes
+
+* correct release ([1593c8a](https://github.com/joelmccoy/terraform-aws-vendor-demo/commit/1593c8ae1b2a08f6ac783f03ec5b4bc5ce57c5d4))
+
 ## [0.1.2](https://github.com/joelmccoy/terraform-aws-vendor-demo/compare/v0.1.1...v0.1.2) (2025-05-21)
 
 
