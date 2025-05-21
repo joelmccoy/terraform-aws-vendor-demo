@@ -5,7 +5,7 @@ A terraform module to demonstrate vendoring in upstream modules and publishing a
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | 1.9.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | ~>1.9 |
 
 ## Providers
 

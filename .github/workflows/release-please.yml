@@ -14,12 +14,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@a02a34c4d625f9be7cb89156071d8567266a2445 # v4
+        id: tag
         with:
-          # this assumes that you have created a personal access token
-          # (PAT) and configured it as a GitHub action secret named
-          # `MY_RELEASE_PLEASE_TOKEN` (this secret name is not important).
-          # token: ${{ secrets.MY_RELEASE_PLEASE_TOKEN }}
-          # optional. customize path to release-please-config.json
           config-file: release-please-config.json
-          # optional. customize path to .release-please-manifest.json
           manifest-file: .release-please-manifest.json
+      - id: release-flag
+        run: echo "release_created=${{ steps.tag.outputs.release_created || false }}" >> $GITHUB_OUTPUT
+
+    publish-oci:
+      name: Publish Module as OCI
+      needs: release-please
+      if: ${{ needs.release-please.outputs.release_created == 'true'}}
+      permissions:
+        contents: write
+        packages: write
+      uses: ./.github/actions/publish-oci
+      with:
+        repository: ${{ github.repository }}
+        tag: ${{ needs.release-please.outputs.tag_name }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}

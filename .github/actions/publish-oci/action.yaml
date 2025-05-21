@@ -1,0 +1,75 @@
+name: 'Publish Terraform Module as OCI'
+description: 'Packages a Terraform module as an OCI artifact and pushes it to GHCR'
+
+inputs:
+  registry:
+    description: 'OCI registry to push to (default: GitHub Container Registry)'
+    required: false
+    default: 'ghcr.io'
+  repository:
+    description: 'Repository name within the registry'
+    required: true
+  tag:
+    description: 'Tag name for the OCI artifact'
+    required: false
+    default: 'latest'
+  github-token:
+    description: 'GitHub token for authentication to GHCR'
+    required: true
+    default: '${{ github.token }}'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up full registry path
+      id: setup
+      shell: bash
+      run: |
+        FULL_REPO="${{ inputs.registry }}/${{ inputs.repository }}"
+        echo "full-repo=$FULL_REPO" >> $GITHUB_OUTPUT
+
+    - name: Install ORAS
+      uses: oras-project/setup-oras@v1
+      with:
+        version: 1.1.0
+
+    - name: Login to GHCR
+      shell: bash
+      run: |
+        echo "${{ inputs.github-token }}" | oras login "${{ inputs.registry }}" --username "${{ github.actor }}" --password-stdin
+
+    - name: Create ZIP archive
+      id: create-zip
+      shell: bash
+      run: |
+        ZIP_FILE="module-package.zip"
+
+        zip -r "$ZIP_FILE" . \
+          -x '.git/*' \
+          -x '.github/*' \
+          -x '.terraform/*' \
+          -x '*.zip' \
+          -x 'terraform.tfstate*'
+
+        if [[ -f "$ZIP_FILE" ]]; then
+          echo "zip-file=$ZIP_FILE" >> $GITHUB_OUTPUT
+          echo "✅ Successfully created ZIP archive: $ZIP_FILE"
+          ls -la "$ZIP_FILE"
+        else
+          echo "❌ Failed to create ZIP archive"
+          exit 1
+        fi
+
+    - name: Push OCI artifact
+      shell: bash
+      run: |
+        ZIP_FILE="${{ steps.create-zip.outputs.zip-file }}"
+        REPO="${{ steps.setup.outputs.full-repo }}"
+        TAG="${{ inputs.tag }}"
+
+        echo "Pushing OCI artifact with tag: $TAG"
+
+        oras push \
+          --artifact-type=application/vnd.opentofu.modulepkg \
+          "$REPO:$TAG" \
+          "$ZIP_FILE:archive/zip"
