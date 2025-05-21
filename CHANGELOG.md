@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.2](https://github.com/joelmccoy/terraform-aws-vendor-demo/compare/v0.1.1...v0.1.2) (2025-05-21)
+
+
+### Bug Fixes
+
+* correct indent ([b4231dd](https://github.com/joelmccoy/terraform-aws-vendor-demo/commit/b4231ddbcf31a10b31d5fbdc1bd9c76848b1ebea))
+* runs-on ([08dd4ed](https://github.com/joelmccoy/terraform-aws-vendor-demo/commit/08dd4edc96d08bcc6b03fc73482d2926c889c078))
+* things ([f45bf89](https://github.com/joelmccoy/terraform-aws-vendor-demo/commit/f45bf8958e89e1118bad221a39f4eb1b6ef92f44))
+
+
+### Miscellaneous Chores
+
+* add oci publish ([#7](https://github.com/joelmccoy/terraform-aws-vendor-demo/issues/7)) ([64de8a7](https://github.com/joelmccoy/terraform-aws-vendor-demo/commit/64de8a7fde991421fc61b9652ec6e7710d075bbe))
+
 ## [0.1.1](https://github.com/joelmccoy/terraform-aws-vendor-demo/compare/v0.1.0...v0.1.1) (2025-05-20)
 
 
