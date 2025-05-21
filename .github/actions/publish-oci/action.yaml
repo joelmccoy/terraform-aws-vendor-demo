@@ -21,16 +21,10 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Set up working directory
+    - name: Set up full registry path
       id: setup
       shell: bash
       run: |
-        # Create temporary directory for artifacts
-        TEMP_DIR="${{ runner.temp }}/terraform-module-oci"
-        mkdir -p "$TEMP_DIR"
-        echo "temp-dir=$TEMP_DIR" >> $GITHUB_OUTPUT
-
-        # Set full registry path
         FULL_REPO="${{ inputs.registry }}/${{ inputs.repository }}"
         echo "full-repo=$FULL_REPO" >> $GITHUB_OUTPUT
 
@@ -47,15 +41,16 @@ runs:
     - name: Create ZIP archive
       id: create-zip
       shell: bash
-      working-directory: '.'
       run: |
-        # Define ZIP filename and path
-        ZIP_FILE="${{ steps.setup.outputs.temp-dir }}/module-package.zip"
+        ZIP_FILE="module-package.zip"
 
-        # Create the ZIP archive with standard exclusions
-        zip -r $ZIP_FILE . -x '.git/*' -x '.github/*' -x '.terraform/*' -x '*.zip' -x 'terraform.tfstate*'
+        zip -r "$ZIP_FILE" . \
+          -x '.git/*' \
+          -x '.github/*' \
+          -x '.terraform/*' \
+          -x '*.zip' \
+          -x 'terraform.tfstate*'
 
-        # Verify ZIP was created
         if [[ -f "$ZIP_FILE" ]]; then
           echo "zip-file=$ZIP_FILE" >> $GITHUB_OUTPUT
           echo "✅ Successfully created ZIP archive: $ZIP_FILE"
@@ -78,8 +73,3 @@ runs:
           --artifact-type=application/vnd.opentofu.modulepkg \
           "$REPO:$TAG" \
           "$ZIP_FILE:archive/zip"
-
-        echo "✅ Successfully pushed artifact to $REPO:$TAG"
-        echo "OCI artifact is now available as:"
-        echo "- oci://$REPO:$TAG"
-        echo "- oci://$REPO?tag=$TAG"
